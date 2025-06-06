@@ -1,15 +1,90 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+enum TicketStatus {
+  RESERVED
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(CLIENT)
+  createdAt    DateTime @default(now())
+  events       Event[]  @relation("CreatedEvents")
+  tickets      Ticket[]
+
+  @@map("users")
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  location    String
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  sessions    Session[]
+  creator     User      @relation("CreatedEvents", fields: [createdBy], references: [id])
+
+  @@map("events")
+}
+
+model Session {
+  id               String   @id @default(uuid())
+  eventId          String
+  datetime         DateTime
+  totalTickets     Int
+  ticketsAvailable Int
+  price            Decimal  @db.Decimal(10, 2)
+  createdAt        DateTime @default(now())
+  event            Event    @relation(fields: [eventId], references: [id])
+  tickets          Ticket[]
+
+  @@map("sessions")
+}
+
+model Ticket {
+  id           String       @id @default(uuid())
+  sessionId    String
+  userId       String
+  purchaseDate DateTime     @default(now())
+  status       TicketStatus @default(CONFIRMED)
+  session      Session      @relation(fields: [sessionId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  payment      Payment?
+
+  @@unique([sessionId, userId])
+  @@map("tickets")
+}
+
+model Payment {
+  id       String        @id @default(uuid())
+  ticketId String        @unique
+  amount   Decimal       @db.Decimal(10, 2)
+  status   PaymentStatus @default(PENDING)
+  paidAt   DateTime?
+  ticket   Ticket        @relation(fields: [ticketId], references: [id])
+
+  @@map("payments")
 }
